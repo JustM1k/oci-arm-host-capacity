@@ -23,6 +23,12 @@ jobs:
         run: |
           echo "${{ secrets.OCI_KEY_CONTENT }}" > /home/runner/oci_private.pem
           chmod 600 /home/runner/oci_private.pem
+      - name: Save private key to file
+        run: |
+          echo "${{ secrets.OCI_KEY_CONTENT }}" > /home/runner/oci_private.pem
+          chmod 600 /home/runner/oci_private.pem
+          # Убираем переносы строк из SSH публичного ключа
+          echo "${{ secrets.OCI_SSH_PUBLIC_KEY }}" | tr -d '\n' > /home/runner/ssh_pub.key
       - name: Validate composer.json and composer.lock
         run: composer validate
       - name: Install dependencies

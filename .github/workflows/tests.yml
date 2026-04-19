@@ -6,7 +6,11 @@ on:
 jobs:
   create:
     runs-on: ubuntu-latest
-    name: Try to create ARM instance
+    strategy:
+      matrix:
+        ad: ['AD-1', 'AD-2', 'AD-3']
+      fail-fast: false
+    name: Try AD ${{ matrix.ad }}
     steps:
       - uses: actions/checkout@v4
       - name: Install PHP
@@ -20,7 +24,14 @@ jobs:
       - name: Install dependencies
         run: composer update --prefer-dist --no-progress
       - name: Run instance creation
-        run: php index.php
+        id: create
+        run: |
+          OUTPUT=$(php index.php 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q '"lifecycleState"'; then
+            echo "created=true" >> $GITHUB_OUTPUT
+            echo "output=$OUTPUT" >> $GITHUB_OUTPUT
+          fi
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
           OCI_USER_ID: ${{ secrets.OCI_USER }}
@@ -35,5 +46,12 @@ jobs:
           OCI_MAX_INSTANCES: 1
           OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
           OCI_BOOT_VOLUME_SIZE_IN_GBS: 200
-          CACHE_AVAILABILITY_DOMAINS: 1
+          OCI_AVAILABILITY_DOMAIN: ${{ matrix.ad }}
+          CACHE_AVAILABILITY_DOMAINS: 0
           TOO_MANY_REQUESTS_TIME_WAIT: 600
+      - name: Notify Telegram on success
+        if: steps.create.outputs.created == 'true'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="✅ Oracle ARM инстанс создан в ${{ matrix.ad }}! Заходи в Oracle Cloud и забирай IP адрес 🎉"
